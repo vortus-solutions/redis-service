@@ -17,10 +17,9 @@
         "postversion": "git push && git push --tags"
     },
     "keywords": [
-        "kafka",
-        "messaging",
-        "queue",
-        "stream",
+        "redis",
+        "pubsub",
+        "memory-cache",
         "event-driven",
         "microservices"
     ],
@@ -31,7 +30,7 @@
         "url": "git+https://github.com/vortus-solutions/redis-service.git"
     },
     "dependencies": {
-        
+        "ioredis": "^5.4.1"
     },
     "devDependencies": {
         "@babel/cli": "^7.23.0",

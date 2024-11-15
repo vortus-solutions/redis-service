@@ -1,9 +1,9 @@
 'use strict';
 
 const redisService = require('./redisService');
-const luaScriptsService = require('./luaScriptsService');
+const luaScriptService = require('./luaScriptService');
 
 module.exports = {
     RedisService: redisService,
-    LuaScriptsService: luaScriptsService
+    LuaScriptService: luaScriptService
 };

@@ -14,26 +14,23 @@ A Node.js package that provides a robust Redis service implementation with built
 ## Installation
 
 ```bash
-npm install redis-service-lua
+npm install @vortus-solutions/redis-service
 ```
 
 ## Basic Usage
 
 ```javascript
-const { RedisService } = require('redis-service-lua');
-
-// Initialize Redis service with desired Lua scripts
-const redisService = new RedisService({}, ['zaddLimit', 'expireNX']);
+const RedisService = require('@vortus-solutions/redis-service');
 
 // Create a connection
-await redisService.createConnection('main', {
+await RedisService.createConnection('main', {
     host: '127.0.0.1',
     port: 6379,
     db: 0
-});
+}, []);
 
 // Get connection instance
-const redis = redisService.getConnection('main');
+const redis = RedisService.getConnection('main');
 ```
 
 ## Available Lua Scripts
@@ -42,42 +39,42 @@ const redis = redisService.getConnection('main');
 Adds a member to a sorted set with a limit on the total number of members.
 
 **Parameters:**
-- Key: Sorted set key
-- Score: Member score
-- Member: Value to add
-- Limit: Maximum number of members
-- Offset: Number of members to remove from start
+- `key`: Sorted set key
+- `score`: Member score
+- `member`: Value to add
+- `limit`: Maximum number of members
+- `offset`: Number of members to remove from start
 
 ### expireNX
 Sets expiration on a key only if it doesn't have one.
 
 **Parameters:**
-- Key: Redis key
-- TTL: Time to live in seconds
+- `key`: Redis key
+- `ttl`: Time to live in seconds
 
 ### setHIfHigher
 Sets hash field value only if new value is higher than existing.
 
 **Parameters:**
-- Key: Hash key
-- Field: Hash field
-- Value: New value
+- `key`: Hash key
+- `field`: Hash field
+- `value`: New value
 
 ### setHIfLower
 Sets hash field value only if new value is lower than existing.
 
 **Parameters:**
-- Key: Hash key
-- Field: Hash field
-- Value: New value
+- `key`: Hash key
+- `field`: Hash field
+- `value`: New value
 
 ### getPolylineChunks
 Retrieves polyline chunks based on latitude and longitude bounds.
 
 **Parameters:**
-- Key: Base key for polyline data
-- Latitude: Target latitude
-- Longitude: Target longitude
+- `key`: Base key for polyline data
+- `latitude`: Target latitude
+- `longitude`: Target longitude
 
 ## API Reference
 
@@ -85,23 +82,25 @@ Retrieves polyline chunks based on latitude and longitude bounds.
 
 #### Constructor
 ```javascript
-new RedisService(options = {}, luaScriptNames = [])
+new RedisService()
 ```
 
 #### Methods
-- `createConnection(connectionName, customOptions)`: Creates new Redis connection
-- `getConnection(connectionName)`: Returns existing connection
-- `closeAll()`: Closes all active connections
+- `createConnection(connectionName, options = {}, luaScriptNames = [])`: Creates a new Redis connection.
+- `getConnection(connectionName)`: Returns the existing connection by name.
+- `closeAll()`: Closes all active connections.
 
 ### LuaScriptsService
 
 #### Methods
-- `register(name, script)`: Register new Lua script
-- `get(name)`: Get script by name
-- `getScripts(names)`: Get multiple scripts
-- `getAvailableScripts()`: List all available scripts
+- `register(name, script)`: Register a new Lua script.
+- `get(name)`: Get a script by name.
+- `getScripts(names)`: Get multiple scripts by their names.
+- `getAvailableScripts()`: List all available scripts.
 
 ## Configuration Options
+
+Default connection options can be customized when creating a connection:
 
 ```javascript
 const defaultOptions = {
@@ -120,7 +119,7 @@ The package includes built-in error handling for connection issues:
 
 ```javascript
 try {
-    await redisService.createConnection('main');
+    await RedisService.createConnection('main');
 } catch (error) {
     console.error('Redis connection error:', error);
 }
@@ -129,13 +128,12 @@ try {
 ## Best Practices
 
 1. Always close connections when done:
-```javascript
-await redisService.closeAll();
-```
-
-2. Reuse connections instead of creating new ones
-3. Handle connection errors appropriately
-4. Use auto-pipelining for bulk operations
+   ```javascript
+   await RedisService.closeAll();
+   ```
+2. Reuse connections instead of creating new ones.
+3. Handle connection errors appropriately.
+4. Use auto-pipelining for bulk operations.
 
 ## License
 

@@ -1,6 +1,6 @@
 {
     "name": "@vortus-solutions/redis-service",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "A robust Redis service client for Node.js applications",
     "main": "lib/index.js",
     "files": [

@@ -85,20 +85,22 @@ class RedisService extends EventEmitter {
     }
 
     /**
-     * Create a new Redis connection
+     * Create a new Redis single-instance connection
      * @param {string} connectionName - Unique identifier for the connection
      * @param {Object} options - Redis connection options
      * @param {string[]} luaScriptNames - Names of Lua scripts to load
      * @returns {Promise<Redis>} Promise resolving to Redis connection
      * @throws {Error} If connection with same name already exists
      * 
-     * Default connection options:
-     * - host: '127.0.0.1'
-     * - port: 6379
-     * - db: 0
-     * - enableAutoPipelining: false
-     * - showFriendlyErrorStack: true
-     * - enableOfflineQueue: true
+     * Connection options:
+     * - host: Redis host (default: '127.0.0.1')
+     * - port: Redis port (default: 6379)
+     * - db: Redis database number (default: 0)
+     * - keyPrefix: Prefix for all keys
+     * - password: Authentication password
+     * - enableAutoPipelining: Enable automatic pipelining of commands
+     * - showFriendlyErrorStack: Show detailed error stack
+     * - enableOfflineQueue: Queue commands when connection is down
      */
     async createConnection(connectionName, options = {}, luaScriptNames = []) {
         if (this.connections.has(connectionName)) {
@@ -107,24 +109,91 @@ class RedisService extends EventEmitter {
             throw error;
         }
 
-        const connectionOptions = {
+        const baseOptions = {
             enableAutoPipelining: false,
             showFriendlyErrorStack: true,
             enableOfflineQueue: true,
             host: '127.0.0.1',
             port: 6379,
             db: 0,
-            ...options
+            ...options,
+        };
+
+        if (baseOptions.logger) {
+            this.setupLogger(baseOptions.logger);
+        }
+
+        this.logger.debug(`Creating Redis single instance connection: ${connectionName}`, baseOptions);
+        this.emit('connectionAttempt', { connectionName, options: baseOptions });
+
+        const connection = new Redis(baseOptions);
+
+        const luaScripts = luaScriptNames.length > 0
+            ? luaScriptsService.getScripts(luaScriptNames)
+            : {};
+
+        // Set up event forwarding
+        this._setupEventForwarding(connection, connectionName);
+
+        return this._handleConnectionPromise(connection, connectionName, luaScripts);
+    }
+
+    /**
+     * Create a new Redis cluster connection
+     * @param {string} connectionName - Unique identifier for the connection
+     * @param {Object} options - Redis cluster connection options
+     * @param {string[]} luaScriptNames - Names of Lua scripts to load
+     * @returns {Promise<Redis.Cluster>} Promise resolving to Redis cluster connection
+     * @throws {Error} If connection with same name already exists
+     * 
+     * Cluster connection options:
+     * - nodes: Array of nodes [{ host, port }] (required)
+     * - keyPrefix: Prefix for all keys
+     * - password: Authentication password
+     * - scaleReads: Read distribution strategy (default: 'slave')
+     * - clusterRetryStrategy: Function to determine retry delay
+     * - maxRedirections: Maximum number of redirections to follow
+     * - enableAutoPipelining: Enable automatic pipelining of commands
+     * - showFriendlyErrorStack: Show detailed error stack
+     * - enableOfflineQueue: Queue commands when connection is down
+     */
+    async createClusterConnection(connectionName, options = {}, luaScriptNames = []) {
+        if (this.connections.has(connectionName)) {
+            const error = new Error(`Connection ${connectionName} already exists`);
+            this.emit('error', error);
+            throw error;
+        }
+
+        if (!options.nodes || !Array.isArray(options.nodes) || options.nodes.length === 0) {
+            const error = new Error('Cluster connection requires at least one node');
+            this.emit('error', error);
+            throw error;
+        }
+
+        const clusterOptions = {
+            scaleReads: options.scaleReads || 'slave',
+            redisOptions: {
+                enableAutoPipelining: false,
+                showFriendlyErrorStack: true,
+                enableOfflineQueue: true,
+                // Default cluster specific options
+                clusterRetryStrategy: options.clusterRetryStrategy || ((times) => {
+                    return Math.min(times * 100, 2000); // Maximum 2 seconds delay
+                }),
+                maxRedirections: 16,
+                ...options
+            }
         };
 
         if (options.logger) {
             this.setupLogger(options.logger);
         }
 
-        this.logger.debug(`Creating Redis connection: ${connectionName}`, connectionOptions);
-        this.emit('connectionAttempt', { connectionName, options: connectionOptions });
+        this.logger.debug(`Creating Redis cluster connection: ${connectionName}`, clusterOptions);
+        this.emit('connectionAttempt', { connectionName, options: clusterOptions });
 
-        const connection = new Redis(connectionOptions);
+        const connection = new Redis.Cluster(options.nodes, clusterOptions);
+
         const luaScripts = luaScriptNames.length > 0
             ? luaScriptsService.getScripts(luaScriptNames)
             : {};
@@ -177,7 +246,11 @@ class RedisService extends EventEmitter {
 
             // Error handling
             connection.on('error', (error) => {
-                this.logger.error(`Redis ${connectionName} connection error:`, error);
+                if (error.code === 'NOAUTH' || error.message.includes('Authentication')) {
+                    this.logger.error(`Redis ${connectionName} authentication failed: ${error.message}`);
+                } else {
+                    this.logger.error(`Redis ${connectionName} connection error:`, error);
+                }
                 this.emit('connectionError', { connectionName, error });
                 reject(error);
             });

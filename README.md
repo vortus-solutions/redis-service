@@ -22,11 +22,19 @@ npm install @vortus-solutions/redis-service
 ```javascript
 const RedisService = require('@vortus-solutions/redis-service');
 
-// Create a connection
+// Create a single instance connection
 await RedisService.createConnection('main', {
     host: '127.0.0.1',
     port: 6379,
     db: 0
+}, []);
+
+// Or create a cluster connection
+await RedisService.createClusterConnection('cluster', {
+    nodes: [
+        { host: 'redis-node1.example.com', port: 6379 },
+        { host: 'redis-node2.example.com', port: 6379 }
+    ]
 }, []);
 
 // Get connection instance
@@ -86,7 +94,8 @@ new RedisService()
 ```
 
 #### Methods
-- `createConnection(connectionName, options = {}, luaScriptNames = [])`: Creates a new Redis connection.
+- `createConnection(connectionName, options = {}, luaScriptNames = [])`: Creates a new Redis single-instance connection.
+- `createClusterConnection(connectionName, options = {}, luaScriptNames = [])`: Creates a new Redis cluster connection.
 - `getConnection(connectionName)`: Returns the existing connection by name.
 - `closeAll()`: Closes all active connections.
 
@@ -100,10 +109,12 @@ new RedisService()
 
 ## Configuration Options
 
-Default connection options can be customized when creating a connection:
+Default connection options can be customized when creating a connection. The service supports both single Redis instances and Redis clusters with separate methods. All additional options are forwarded directly to ioredis, supporting its full range of configuration options.
 
+### Single Instance Configuration
+Use with `createConnection()` method:
 ```javascript
-const defaultOptions = {
+const singleInstanceOptions = {
     enableAutoPipelining: false,
     showFriendlyErrorStack: true,
     enableOfflineQueue: true,
@@ -111,7 +122,37 @@ const defaultOptions = {
     port: 6379,
     db: 0
 };
+
+// Create single instance connection
+await RedisService.createConnection('main', singleInstanceOptions, []);
 ```
+
+### Cluster Configuration
+Use with `createClusterConnection()` method:
+```javascript
+const clusterOptions = {
+    nodes: [
+        { host: '127.0.0.1', port: 6379 },
+        { host: '127.0.0.1', port: 6380 }
+    ],
+    scaleReads: 'slave',
+    clusterRetryStrategy: (times) => Math.min(times * 100, 2000),
+    maxRedirections: 16,
+    enableAutoPipelining: true,
+    showFriendlyErrorStack: true
+};
+
+// Create cluster connection
+await RedisService.createClusterConnection('cluster', clusterOptions, []);
+```
+
+### Common Options
+- `enableAutoPipelining`: Enable automatic pipelining for improved performance
+- `showFriendlyErrorStack`: Show detailed error stack traces
+- `enableOfflineQueue`: Enable offline queue for connection retries
+- `keyPrefix`: Prefix for all Redis keys
+- `password`: Redis authentication password
+- `tls`: Enable TLS encryption
 
 ## Error Handling
 
@@ -119,7 +160,11 @@ The package includes built-in error handling for connection issues:
 
 ```javascript
 try {
-    await RedisService.createConnection('main');
+    // For single instance
+    await RedisService.createConnection('main', { host: 'localhost' });
+    
+    // Or for cluster
+    await RedisService.createClusterConnection('cluster', { nodes: [...] });
 } catch (error) {
     console.error('Redis connection error:', error);
 }
